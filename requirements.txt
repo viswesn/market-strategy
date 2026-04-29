@@ -1,0 +1,13 @@
+# NSE Market Strategy Backtester — dependencies
+# Install: pip install -r requirements.txt
+# On corporate proxy add: --trusted-host pypi.org --trusted-host files.pythonhosted.org
+
+jugaad-data==0.33.1
+pandas==3.0.2
+pandas-ta==0.4.71b0
+mplfinance==0.12.10b0
+matplotlib==3.10.9
+fastapi==0.136.1
+uvicorn==0.46.0
+click==8.3.3
+truststore==0.10.4
