@@ -9,6 +9,7 @@ Usage examples:
 
 import sys
 import click
+import pandas as pd
 import mplfinance as mpf
 import matplotlib.pyplot as plt
 
@@ -55,12 +56,28 @@ def _print_results(result: dict) -> None:
     print(f"Total Trades     : {s['total_trades']}")
 
 
-def _plot(result: dict) -> None:
+def _plot_performance_curve(df, symbol: str, capital: float) -> None:
+    plt.figure()
+    plt.plot(df.index, df['cumulative_balance'], label='Portfolio Balance', color='steelblue')
+    plt.axhline(y=capital, color='gray', linestyle='--', label='Initial Capital')
+    plt.fill_between(df.index, capital, df['cumulative_balance'],
+                     where=(df['cumulative_balance'] >= capital), alpha=0.2, color='green')
+    plt.fill_between(df.index, capital, df['cumulative_balance'],
+                     where=(df['cumulative_balance'] < capital), alpha=0.2, color='red')
+    plt.title(f"{symbol} Performance Curve")
+    plt.xlabel("Date")
+    plt.ylabel("Balance (₹)")
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def _plot_supertrend(result: dict) -> None:
     df = result["df"]
     symbol = result["symbol"]
     capital = result["capital"]
 
-    # Candlestick + bands
     apd = [
         mpf.make_addplot(df['lowerband'], label="Lower Band", color='green'),
         mpf.make_addplot(df['upperband'], label="Upper Band", color='red'),
@@ -76,21 +93,44 @@ def _plot(result: dict) -> None:
     mpf.plot(df, addplot=apd, type='candle', volume=True, style='charles',
              xrotation=20, title=f"{symbol} SuperTrend", fill_between=fills)
 
-    # Performance curve
-    plt.figure()
-    plt.plot(df.index, df['cumulative_balance'], label='Portfolio Balance', color='steelblue')
-    plt.axhline(y=capital, color='gray', linestyle='--', label='Initial Capital')
-    plt.fill_between(df.index, capital, df['cumulative_balance'],
-                     where=(df['cumulative_balance'] >= capital), alpha=0.2, color='green')
-    plt.fill_between(df.index, capital, df['cumulative_balance'],
-                     where=(df['cumulative_balance'] < capital), alpha=0.2, color='red')
-    plt.title(f"{symbol} Performance Curve")
-    plt.xlabel("Date")
-    plt.ylabel("Balance (₹)")
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    _plot_performance_curve(df, symbol, capital)
+
+
+def _plot_swingtrade(result: dict) -> None:
+    df = result["df"]
+    symbol = result["symbol"]
+    capital = result["capital"]
+
+    # RSI panel — fill NaN so mplfinance doesn't complain
+    rsi = df['rsi'].copy()
+    rsi_buy_line = pd.Series(40.0, index=df.index)
+    rsi_sell_line = pd.Series(70.0, index=df.index)
+
+    apd = [
+        mpf.make_addplot(df['ema50'], label="EMA 50", color='orange', width=1.5),
+        mpf.make_addplot(df['buy_positions'],  type='scatter', marker='^',
+                         label="Buy",  markersize=80, color='#2cf651'),
+        mpf.make_addplot(df['sell_positions'], type='scatter', marker='v',
+                         label="Sell", markersize=80, color='#f50100'),
+        mpf.make_addplot(rsi,           panel=2, label="RSI(14)", color='purple', ylabel="RSI"),
+        mpf.make_addplot(rsi_buy_line,  panel=2, label="RSI Buy (40)",  color='green',
+                         linestyle='--', width=0.8),
+        mpf.make_addplot(rsi_sell_line, panel=2, label="RSI Sell (70)", color='red',
+                         linestyle='--', width=0.8),
+    ]
+    mpf.plot(df, addplot=apd, type='candle', volume=True, style='charles',
+             xrotation=20, title=f"{symbol} Swing Trade",
+             panel_ratios=(4, 1, 2))
+
+    _plot_performance_curve(df, symbol, capital)
+
+
+def _plot(result: dict) -> None:
+    strategy = result["strategy"]
+    if strategy == "swingtrade":
+        _plot_swingtrade(result)
+    else:
+        _plot_supertrend(result)
 
 
 @click.command()
