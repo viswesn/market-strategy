@@ -125,10 +125,81 @@ def _plot_swingtrade(result: dict) -> None:
     _plot_performance_curve(df, symbol, capital)
 
 
+def _plot_swinghigh(result: dict) -> None:
+    df     = result["df"]
+    symbol = result["symbol"]
+    capital = result["capital"]
+    trades  = result["trades"]
+
+    apd = [
+        mpf.make_addplot(df['swing_high'], label="Swing High", color='purple',
+                         linestyle='--', width=1.0),
+        mpf.make_addplot(df['ema50'], label="EMA 50", color='steelblue', width=1.2),
+        mpf.make_addplot(df['buy_positions'],  type='scatter', marker='^',
+                         label="Buy",  markersize=80, color='#2cf651'),
+        mpf.make_addplot(df['sell_positions'], type='scatter', marker='v',
+                         label="Sell", markersize=80, color='#f50100'),
+    ]
+
+    fig, axes = mpf.plot(
+        df, addplot=apd, type='candle', volume=True, style='charles',
+        xrotation=20, title=f"{symbol} Swing High Retest",
+        returnfig=True,
+    )
+    ax = axes[0]   # main price panel
+
+    # Mild pastel colors — one per trade, cycling
+    zone_colors = ['#AED6F1', '#A9DFBF', '#FAD7A0', '#D7BDE2', '#FADADD',
+                   '#A2D9CE', '#F9E79F', '#D2B4DE', '#F1948A', '#85C1E9']
+
+    for i, trade in enumerate(trades):
+        swing_h = trade.get('swing_high_at_entry')
+        if swing_h is None:
+            continue
+
+        color = zone_colors[i % len(zone_colors)]
+
+        # Locate integer x-positions (mplfinance uses integer axis for candles)
+        entry_pos = int(df.index.searchsorted(pd.Timestamp(trade['entry_date'])))
+        exit_pos  = int(df.index.searchsorted(pd.Timestamp(trade['exit_date'])))
+        exit_pos  = min(exit_pos, len(df) - 1)
+
+        # ── Shaded vertical band for the entire trade duration ──────────────
+        ax.axvspan(entry_pos - 0.5, exit_pos + 0.5, alpha=0.13, color=color, zorder=0)
+
+        # ── Horizontal dashed line at the swing-high being retested ─────────
+        x_start = max(entry_pos - 8, 0)
+        x_end   = min(exit_pos + 8, len(df) - 1)
+        ax.hlines(
+            swing_h, x_start, x_end,
+            colors=color, linestyles='--', linewidth=1.8, zorder=2,
+        )
+
+        # ── Label: trade number + swing high price ────────────────────────
+        ax.text(
+            entry_pos + 0.5, swing_h,
+            f"  T{i + 1}  SH:{swing_h:.0f}",
+            fontsize=7.5, va='bottom', color='navy', zorder=3,
+            bbox=dict(boxstyle='round,pad=0.15', facecolor=color, alpha=0.5, edgecolor='none'),
+        )
+
+        # ── Stop line: 3% below swing high ───────────────────────────────
+        stop_level = swing_h * 0.97
+        ax.hlines(
+            stop_level, x_start, x_end,
+            colors='red', linestyles=':', linewidth=1.2, zorder=2,
+        )
+
+    plt.show()
+    _plot_performance_curve(df, symbol, capital)
+
+
 def _plot(result: dict) -> None:
     strategy = result["strategy"]
     if strategy == "swingtrade":
         _plot_swingtrade(result)
+    elif strategy == "swinghigh":
+        _plot_swinghigh(result)
     else:
         _plot_supertrend(result)
 
