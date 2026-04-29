@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+
+# Cached market data
+data/
+
+# VS Code
+.vscode/
+
+# OS
+Thumbs.db
+desktop.ini
