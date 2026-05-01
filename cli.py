@@ -131,14 +131,11 @@ def _plot_swinghigh(result: dict) -> None:
     capital = result["capital"]
     trades  = result["trades"]
 
+    # Only EMA + swing-high line; numbered markers are drawn manually below
     apd = [
         mpf.make_addplot(df['swing_high'], label="Swing High", color='purple',
                          linestyle='--', width=1.0),
         mpf.make_addplot(df['ema50'], label="EMA 50", color='steelblue', width=1.2),
-        mpf.make_addplot(df['buy_positions'],  type='scatter', marker='^',
-                         label="Buy",  markersize=80, color='#2cf651'),
-        mpf.make_addplot(df['sell_positions'], type='scatter', marker='v',
-                         label="Sell", markersize=80, color='#f50100'),
     ]
 
     fig, axes = mpf.plot(
@@ -157,39 +154,64 @@ def _plot_swinghigh(result: dict) -> None:
         if swing_h is None:
             continue
 
+        n     = i + 1           # trade number shown in both icons
         color = zone_colors[i % len(zone_colors)]
 
-        # Locate integer x-positions (mplfinance uses integer axis for candles)
+        # Integer x-positions (mplfinance uses integer axis for candles)
         entry_pos = int(df.index.searchsorted(pd.Timestamp(trade['entry_date'])))
         exit_pos  = int(df.index.searchsorted(pd.Timestamp(trade['exit_date'])))
         exit_pos  = min(exit_pos, len(df) - 1)
 
-        # ── Shaded vertical band for the entire trade duration ──────────────
-        ax.axvspan(entry_pos - 0.5, exit_pos + 0.5, alpha=0.13, color=color, zorder=0)
+        # X bar = the actual bar that FORMED the swing high (can be weeks before entry)
+        sh_bar_date = trade.get('swing_high_bar_date')
+        x_pos = int(df.index.searchsorted(pd.Timestamp(sh_bar_date))) if sh_bar_date else max(entry_pos - 1, 0)
 
-        # ── Horizontal dashed line at the swing-high being retested ─────────
-        x_start = max(entry_pos - 8, 0)
-        x_end   = min(exit_pos + 8, len(df) - 1)
-        ax.hlines(
-            swing_h, x_start, x_end,
-            colors=color, linestyles='--', linewidth=1.8, zorder=2,
-        )
+        # ── Shaded vertical band from X bar through exit ────────────────────
+        ax.axvspan(x_pos - 0.5, exit_pos + 0.5, alpha=0.10, color=color, zorder=0)
 
-        # ── Label: trade number + swing high price ────────────────────────
+        # ── Swing-high dashed line from X to exit ────────────────────────
+        x_start = max(x_pos - 2, 0)
+        x_end   = min(exit_pos + 3, len(df) - 1)
+        ax.hlines(swing_h, x_start, x_end,
+                  colors=color, linestyles='--', linewidth=1.8, zorder=2)
         ax.text(
             entry_pos + 0.5, swing_h,
-            f"  T{i + 1}  SH:{swing_h:.0f}",
-            fontsize=7.5, va='bottom', color='navy', zorder=3,
-            bbox=dict(boxstyle='round,pad=0.15', facecolor=color, alpha=0.5, edgecolor='none'),
+            f"  SH:{swing_h:.0f}",
+            fontsize=7, va='bottom', color='navy', zorder=3,
+            bbox=dict(boxstyle='round,pad=0.12', facecolor=color,
+                      alpha=0.55, edgecolor='none'),
         )
 
-        # ── Stop line: 3% below swing high ───────────────────────────────
-        stop_level = swing_h * 0.97
-        ax.hlines(
-            stop_level, x_start, x_end,
-            colors='red', linestyles=':', linewidth=1.2, zorder=2,
+        # ── Stop line: 3% below ENTRY price (from trade dict) ─────────────
+        stop_level = trade.get('stop_level') or (trade['entry_price'] * 0.97)
+        ax.hlines(stop_level, x_start, x_end,
+                  colors='red', linestyles=':', linewidth=1.1, zorder=2)
+
+        # ── X{n} badge — orange, sits above the swing-high formation bar ─
+        x_bar_high = float(df['high'].iloc[x_pos])
+        y_range    = ax.get_ylim()
+        offset     = (y_range[1] - y_range[0]) * 0.018
+        ax.annotate(
+            f"✕{n}",
+            xy=(x_pos, x_bar_high + offset),
+            fontsize=8, fontweight='bold', color='white',
+            ha='center', va='bottom', zorder=6,
+            bbox=dict(boxstyle='round,pad=0.28', facecolor='#E87000',
+                      edgecolor='white', linewidth=0.6),
         )
 
+        # ── ▲{n} badge — green, sits below the entry bar low ─────────────
+        entry_low = float(df['low'].iloc[entry_pos])
+        ax.annotate(
+            f"▲{n}",
+            xy=(entry_pos, entry_low - offset),
+            fontsize=8, fontweight='bold', color='white',
+            ha='center', va='top', zorder=6,
+            bbox=dict(boxstyle='round,pad=0.28', facecolor='#18A558',
+                      edgecolor='white', linewidth=0.6),
+        )
+
+    plt.tight_layout()
     plt.show()
     _plot_performance_curve(df, symbol, capital)
 

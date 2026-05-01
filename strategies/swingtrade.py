@@ -50,11 +50,16 @@ def _generate_signals(
         rsi = df['rsi'].iloc[i]
         prev_rsi = df['rsi'].iloc[i - 1] if i > 0 else rsi
         close = df['close'].iloc[i]
+        prev_close = df['close'].iloc[i - 1] if i > 0 else close
         ema = df['ema50'].iloc[i]
+        prev_ema = df['ema50'].iloc[i - 1] if i > 0 else ema
 
         if not in_trade:
-            # Enter: RSI crosses above rsi_buy AND price in uptrend
-            if prev_rsi < rsi_buy and rsi >= rsi_buy and close > ema:
+            # Entry condition 1: RSI crosses above rsi_buy from below AND price in uptrend
+            rsi_crossover = prev_rsi < rsi_buy and rsi >= rsi_buy and close > ema
+            # Entry condition 2: close crosses above EMA50 from below while RSI shows momentum
+            ema_breakout = prev_close <= prev_ema and close > ema and rsi > rsi_buy
+            if rsi_crossover or ema_breakout:
                 raw.append(1)
                 in_trade = True
             else:
